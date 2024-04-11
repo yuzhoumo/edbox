@@ -49,8 +49,8 @@ def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thr
     year = course["year"]
     id = course["id"]
     name = f"{code} {session} {year} ({id})"
-    dirname = name.replace("/", "_")
-    dirname = "".join(c for c in name if c.isalnum() or c == " ")
+    dirname = name.replace("/", " ")
+    dirname = "".join(c for c in dirname if c.isalnum() or c == " ")
     dirname = f"archive/{dirname.lower().strip().replace(" ", "-")}"
 
     print(f"\n{Color.BLUE}Archiving course: {Color.BOLD}{Color.CYAN}{name}{Color.NC}\n")
