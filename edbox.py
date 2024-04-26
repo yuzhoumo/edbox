@@ -17,6 +17,7 @@ from edapi.types import EdError
 type ThreadGenerator = Generator[API_Thread_WithUser, None, None]
 type RequestGenerator = Generator[tuple[int, Response], None, None]
 
+
 # Global config
 ED_USER_AVATAR_BASE_URL = "https://static.us.edusercontent.com/avatars"
 ED_CDN_REGEX = r"(?:(?:http[s]?://)?(?:static\.us\.edusercontent\.com))/files/[^\\\'\"\s)]*"
@@ -30,6 +31,7 @@ STARTUP_BANNER = r"""
 
 """
 
+ed = EdAPI() # Global ed client
 
 class Color:
     MAGENTA   = '\033[95m'
@@ -75,7 +77,7 @@ def select_courses(courses: list[API_Course]) -> list[API_Course]:
         exit(1)
 
 
-def gen_threads(ed: EdAPI, course_id: int) -> ThreadGenerator:
+def gen_threads(course_id: int) -> ThreadGenerator:
     """Handle pagination and yield threads with user (sidebar feed)"""
     offset = 0
     threads_chunk = ed.list_threads(course_id, limit=100)
@@ -118,12 +120,14 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
         if not os.path.isdir(f"{base_dir}{pl.path}"):
             links_to_archive.append((link, pl))
 
-    cnt = 1
+    cnt, total = 1, len(links_to_archive)
+    old_spinner_text = spinner.text
     reqs = [grequests.get(link) for link, _ in links_to_archive]
     for i, res in gen_get_requests(reqs):
         link, pl = links_to_archive[i] # Indices come back in arbitrary order
         filename = extract_filename(res)
-        spinner.text = f"{cnt} | {Color.MAGENTA}Archiving file{Color.NC}: {filename}..."
+        status = f"{cnt}/{total} | {Color.MAGENTA}Archiving file{Color.NC}: {filename}"
+        spinner.text = f"{old_spinner_text} | {status}"
         cnt += 1
 
         dir = f"{base_dir}{pl.path}"
@@ -133,6 +137,8 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
         f.close()
         os.listdir(dir)[0]
 
+    status = f"{Color.MAGENTA}Converting links...{Color.NC}"
+    spinner.text = f"{old_spinner_text} | {status}"
     for link, pl in zip(links, parsed_links):
         path = f"{base_dir}{pl.path}"
         filename = os.listdir(path)[0]
@@ -141,7 +147,7 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
     return thread_json
 
 
-def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thread_WithComments]:
+def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithComments]:
     """Archive all threads from a given course"""
     name = f"{course["code"]} {course["session"]} {course["year"]} ({course["id"]})"
     dirname = name.replace("/", " ")
@@ -154,7 +160,7 @@ def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thr
     pathlib.Path(f"{dirname}/original").mkdir(parents=True, exist_ok=True)
     spinner.start()
 
-    for thread_with_user in gen_threads(ed, course["id"]):
+    for thread_with_user in gen_threads(course["id"]):
         tid = thread_with_user["id"]
         dst = f"{dirname}/original/{tid}.json"
         title_snippet = thread_with_user["title"][:32]
@@ -182,20 +188,9 @@ def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thr
     return results
 
 
-def main(starting_course_index: int = 0):
-    """Main function, takes starting course index used for error recovery."""
-    if starting_course_index == 0:
-        print(f"{Color.BLUE}{STARTUP_BANNER}{Color.NC}")
-
-    ed = EdAPI()
-    try:
-        ed.login()
-    except Exception as e:
-        print(f"{Color.FAIL}Authentication Error: {e}{Color.NC}")
-        exit(1)
-
+def main(courses: list[API_Course] = []):
     spinner = Halo(spinner="dots")
-    recovery_course_index = 0
+    current_course_index = 0
 
     try:
         user = ed.get_user_info()
@@ -203,12 +198,13 @@ def main(starting_course_index: int = 0):
         with open(f"{OUT_DIR}/user.json", "w") as f:
             f.write(json.dumps(user, indent=2))
 
-        courses = select_courses([c["course"] for c in user["courses"]])
-        courses.sort(key=lambda c: c["id"])
+        if len(courses) == 0:
+            courses = select_courses([c["course"] for c in user["courses"]])
+            courses.sort(key=lambda c: c["id"])
 
-        for i in range(starting_course_index, len(courses)):
-            recovery_course_index = i
-            archive_course(ed, courses[i], spinner)
+        for i, course in enumerate(courses):
+            current_course_index = i
+            archive_course(course, spinner)
 
     except EdError as e:
         spinner.fail(f"Encountered Ed Error: {e}")
@@ -218,11 +214,19 @@ def main(starting_course_index: int = 0):
             spinner.text = f"{Color.FAIL}Timeout, retry in: {i}{Color.NC}"
             time.sleep(1)
         spinner.stop()
-        main(recovery_course_index)
+        main(courses[current_course_index:])
 
     except Exception as e:
         print(f"{Color.FAIL}Encountered exception: {e}{Color.NC}")
 
 
 if __name__ == "__main__":
+    print(f"{Color.BLUE}{STARTUP_BANNER}{Color.NC}")
+
+    try:
+        ed.login()
+    except Exception as e:
+        print(f"{Color.FAIL}Authentication Error: {e}{Color.NC}")
+        exit(1)
+
     main()
