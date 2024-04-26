@@ -1,2 +1,4 @@
 edapi==0.0.2
+grequests==0.7.0
 halo==0.0.31
+requests==2.31.0
