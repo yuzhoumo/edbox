@@ -1,6 +1,7 @@
 from edapi import EdAPI
+from edapi.types.api_types.endpoints.user import API_User_Response_Course
 from edapi.types.api_types.course import API_Course
-from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser
+from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
 from edapi.types import EdError
 from typing import Generator
 from halo import Halo
@@ -29,6 +30,38 @@ class Color:
     NC        = '\033[0m'
     BOLD      = '\033[1m'
     UNDERLINE = '\033[4m'
+
+
+def parse_selection(selection: str, num_classes: int) -> set[int]:
+    """Parse user input from the class selection menu."""
+    result = set()
+    groups = selection.split(",")
+    for g in groups:
+        pair = g.split("-")
+        first, last = int(pair[0]), int(pair[-1])
+        if first < 1 or last > num_classes:
+            raise ValueError(f"Selection is out of range")
+        result.update(range(int(first), int(last)+1))
+    return result
+
+
+def select_courses(courses: list[API_Course]) -> list[API_Course]:
+    """
+    Prompts the user to choose courses to archive.
+    """
+    for i, c in enumerate(courses):
+        print(f"{i+1}: {c['code']} {c['session']} {c['year']} ({c['id']})")
+
+    print(f"\n{Color.MAGENTA}Enter the classes you would like to archive"+\
+          f" as a comma-separated list.\nEntries can be either numbers or"+\
+          f" ranges.\nExample: 1,5-7,9-12{Color.NC}")
+
+    try:
+        selection = parse_selection(input(">>> "), len(courses))
+        return [courses[i-1] for i in sorted(selection)]
+    except Exception as e:
+        print(f"{Color.FAIL}Invalid selection. {e}{Color.NC}")
+        exit(1)
 
 
 def gen_threads(ed: EdAPI, course_id: int) -> Generator[API_Thread_WithUser, None, None]:
@@ -105,11 +138,13 @@ def main(starting_course_index=0):
         with open("archive/user.json", "w") as f:
             f.write(json.dumps(user, indent=2))
 
-        courses = sorted(user["courses"], key=lambda c: c["course"]["id"])
+        courses = [c["course"] for c in user["courses"]]
+        courses.sort(key=lambda c: c["id"])
+        courses = select_courses(courses)
 
         for i in range(starting_course_index, len(courses)):
             recovery_course_index = i
-            archive_course(ed, courses[i]["course"], spinner)
+            archive_course(ed, courses[i], spinner)
 
     except EdError as e:
         spinner.fail(f"Encountered Ed Error: {e}")
