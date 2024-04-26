@@ -1,16 +1,26 @@
-from edapi import EdAPI
-from edapi.types.api_types.endpoints.user import API_User_Response_Course
-from edapi.types.api_types.course import API_Course
-from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
-from edapi.types import EdError
-from typing import Generator
-from halo import Halo
+import grequests # IMPORTANT: Must be imported before "requests"
 import time
 import json
 import pathlib
 import os
+import re
+from urllib.parse import unquote, urlparse
+from edapi import EdAPI
+from halo import Halo
 
+# Type definitions
+from requests import Response
+from typing import Generator
+from edapi.types.api_types.course import API_Course
+from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser
+from edapi.types import EdError
+type ThreadGenerator = Generator[API_Thread_WithUser, None, None]
+type RequestGenerator = Generator[tuple[int, Response], None, None]
 
+# Global config
+ED_USER_AVATAR_BASE_URL = "https://static.us.edusercontent.com/avatars"
+ED_CDN_REGEX = r"(?:(?:http[s]?://)?(?:static\.us\.edusercontent\.com))/files/[^\\\'\"\s)]*"
+OUT_DIR = "out"
 TIMEOUT_SECONDS = 30
 STARTUP_BANNER = r"""
    ____   _____
@@ -19,6 +29,7 @@ STARTUP_BANNER = r"""
 /___/\___/____/\___/_\_\
 
 """
+
 
 class Color:
     MAGENTA   = '\033[95m'
@@ -64,7 +75,7 @@ def select_courses(courses: list[API_Course]) -> list[API_Course]:
         exit(1)
 
 
-def gen_threads(ed: EdAPI, course_id: int) -> Generator[API_Thread_WithUser, None, None]:
+def gen_threads(ed: EdAPI, course_id: int) -> ThreadGenerator:
     """Handle pagination and yield threads with user (sidebar feed)"""
     offset = 0
     threads_chunk = ed.list_threads(course_id, limit=100)
@@ -75,16 +86,67 @@ def gen_threads(ed: EdAPI, course_id: int) -> Generator[API_Thread_WithUser, Non
         threads_chunk = ed.list_threads(course_id, limit=100, offset=offset)
 
 
+def gen_get_requests(reqs: list[grequests.AsyncRequest]) -> RequestGenerator:
+    """Generator for fetching files"""
+    # Fetch asynchronously, 6 at a time
+    for i, res in grequests.imap_enumerated(reqs, size=6):
+        filename = os.path.split(reqs[i].url)[1]
+        if res is None:
+            raise ConnectionError(f"Failed to get: {filename}")
+        yield i, res
+
+
+def extract_filename(res: Response) -> str:
+    """Parse url encoded filename from header and return decoded filename"""
+    cd = res.headers["content-disposition"]
+    encoded_filename = re.findall("filename=\"(.+)\"", cd)[0]
+    decoded_filename = unquote(encoded_filename)
+    return decoded_filename
+
+
+def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner: Halo) -> str:
+    """
+    Archive all static files from a thread and return new json string with
+    converted links.
+    """
+    thread_json = json.dumps(thread)
+    links = list(set(re.findall(ED_CDN_REGEX, thread_json)))
+    parsed_links = [urlparse(link) for link in links]
+
+    links_to_archive = []
+    for link, pl in zip(links, parsed_links):
+        if not os.path.isdir(f"{base_dir}{pl.path}"):
+            links_to_archive.append((link, pl))
+
+    cnt = 1
+    reqs = [grequests.get(link) for link, _ in links_to_archive]
+    for i, res in gen_get_requests(reqs):
+        link, pl = links_to_archive[i] # Indices come back in arbitrary order
+        filename = extract_filename(res)
+        spinner.text = f"{cnt} | {Color.MAGENTA}Archiving file{Color.NC}: {filename}..."
+        cnt += 1
+
+        dir = f"{base_dir}{pl.path}"
+        pathlib.Path(dir).mkdir(parents=True, exist_ok=True)
+        f = open(f"{dir}/{filename}", "wb")
+        f.write(res.content)
+        f.close()
+        os.listdir(dir)[0]
+
+    for link, pl in zip(links, parsed_links):
+        path = f"{base_dir}{pl.path}"
+        filename = os.listdir(path)[0]
+        thread_json = thread_json.replace(link, f"{pl.path.strip("/")}/{filename}")
+
+    return thread_json
+
+
 def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thread_WithComments]:
     """Archive all threads from a given course"""
-    code = course["code"]
-    session = course["session"]
-    year = course["year"]
-    id = course["id"]
-    name = f"{code} {session} {year} ({id})"
+    name = f"{course["code"]} {course["session"]} {course["year"]} ({course["id"]})"
     dirname = name.replace("/", " ")
     dirname = "".join(c for c in dirname if c.isalnum() or c == " ")
-    dirname = f"archive/{dirname.lower().strip().replace(" ", "-")}"
+    dirname = f"{OUT_DIR}/{dirname.lower().strip().replace(" ", "-")}"
 
     print(f"\n{Color.BLUE}Archiving course: {Color.BOLD}{Color.CYAN}{name}{Color.NC}\n")
 
@@ -92,7 +154,7 @@ def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thr
     pathlib.Path(f"{dirname}/original").mkdir(parents=True, exist_ok=True)
     spinner.start()
 
-    for thread_with_user in gen_threads(ed, id):
+    for thread_with_user in gen_threads(ed, course["id"]):
         tid = thread_with_user["id"]
         dst = f"{dirname}/original/{tid}.json"
         title_snippet = thread_with_user["title"][:32]
@@ -110,7 +172,8 @@ def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thr
             f.write(json.dumps(thread_with_comments, indent=2))
             f.close()
 
-        results.append(thread_with_comments)
+        thread_json = archive_thread_files(dirname, thread_with_comments, spinner)
+        results.append(json.loads(thread_json))
 
     with open(f"{dirname}/posts.json", "w") as f:
         f.write(json.dumps(results, indent=2))
@@ -119,7 +182,8 @@ def archive_course(ed: EdAPI, course: API_Course, spinner: Halo) -> list[API_Thr
     return results
 
 
-def main(starting_course_index=0):
+def main(starting_course_index: int = 0):
+    """Main function, takes starting course index used for error recovery."""
     if starting_course_index == 0:
         print(f"{Color.BLUE}{STARTUP_BANNER}{Color.NC}")
 
@@ -135,12 +199,12 @@ def main(starting_course_index=0):
 
     try:
         user = ed.get_user_info()
-        with open("archive/user.json", "w") as f:
+        pathlib.Path(OUT_DIR).mkdir(parents=True, exist_ok=True)
+        with open(f"{OUT_DIR}/user.json", "w") as f:
             f.write(json.dumps(user, indent=2))
 
-        courses = [c["course"] for c in user["courses"]]
+        courses = select_courses([c["course"] for c in user["courses"]])
         courses.sort(key=lambda c: c["id"])
-        courses = select_courses(courses)
 
         for i in range(starting_course_index, len(courses)):
             recovery_course_index = i
