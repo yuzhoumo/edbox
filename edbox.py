@@ -4,17 +4,18 @@ import json
 import pathlib
 import os
 import re
+import edapi
 from urllib.parse import unquote, urlparse
-from edapi import EdAPI
 from halo import Halo
 
 # Type definitions
 from requests import Response
 from typing import Generator
 from edapi.types.api_types.course import API_Course
-from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser
+from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
+from edapi.types.api_types.endpoints.threads import API_ListThreads_Response
 from edapi.types import EdError
-type ThreadGenerator = Generator[API_Thread_WithUser, None, None]
+type ThreadGenerator = Generator[API_ListThreads_Response, None, None]
 type RequestGenerator = Generator[tuple[int, Response], None, None]
 
 
@@ -31,7 +32,28 @@ STARTUP_BANNER = r"""
 
 """
 
-ed = EdAPI() # Global ed client
+
+class PatchedEdAPI(edapi.EdAPI):
+    @edapi.edapi._ensure_login
+    def patched_list_threads(
+        self, /, course_id: int, *, limit: int = 30, offset: int = 0, sort: str = "new"
+    ) -> API_ListThreads_Response:
+
+        from edapi.edapi import API_BASE_URL, _throw_error
+        from edapi.edapi import urljoin
+
+        list_url = urljoin(API_BASE_URL, f"courses/{course_id}/threads")
+        response = self.session.get(
+            list_url, params={"limit": limit, "offset": offset, "sort": sort}
+        )
+        if response.ok:
+            return response.json()
+
+        _throw_error(
+            f"Failed to list threads for course {course_id}.", response.content
+        )
+
+ed = PatchedEdAPI() # Global ed client
 
 class Color:
     MAGENTA   = '\033[95m'
@@ -80,12 +102,11 @@ def select_courses(courses: list[API_Course]) -> list[API_Course]:
 def gen_threads(course_id: int) -> ThreadGenerator:
     """Handle pagination and yield threads with user (sidebar feed)"""
     offset = 0
-    threads_chunk = ed.list_threads(course_id, limit=100)
-    while threads_chunk:
-        for thread_with_user in threads_chunk:
-            yield thread_with_user
-        offset += len(threads_chunk)
-        threads_chunk = ed.list_threads(course_id, limit=100, offset=offset)
+    chunk = ed.patched_list_threads(course_id, limit=100)
+    while chunk["threads"]:
+        yield chunk
+        offset += len(chunk["threads"])
+        chunk = ed.patched_list_threads(course_id, limit=100, offset=offset)
 
 
 def gen_get_requests(reqs: list[grequests.AsyncRequest]) -> RequestGenerator:
@@ -137,14 +158,57 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
         f.close()
         os.listdir(dir)[0]
 
-    status = f"{Color.MAGENTA}Converting links...{Color.NC}"
-    spinner.text = f"{old_spinner_text} | {status}"
     for link, pl in zip(links, parsed_links):
         path = f"{base_dir}{pl.path}"
         filename = os.listdir(path)[0]
         thread_json = thread_json.replace(link, f"{pl.path.strip("/")}/{filename}")
 
     return thread_json
+
+
+def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner: Halo, cnt: int):
+    """Archive a single discussion thread"""
+    tid = thread_with_user["id"]
+    dst = f"{base_dir}/original/{tid}.json"
+    title_snippet = thread_with_user["title"][:32]
+
+    if os.path.isfile(dst):
+        spinner.text = f"{cnt} | {Color.WARNING}Already archived:{Color.NC} {title_snippet}..."
+        f = open(dst, "r")
+        thread_with_comments = API_Thread_WithComments(json.loads(f.read()))
+        f.close()
+    else:
+        spinner.text = f"{cnt} | {Color.MAGENTA}Archiving thread{Color.NC}: {title_snippet}..."
+        thread_with_comments = ed.get_thread(thread_with_user["id"])
+        f = open(dst, "w")
+        f.write(json.dumps(thread_with_comments, indent=2))
+        f.close()
+
+    return archive_thread_files(base_dir, thread_with_comments, spinner)
+
+
+def archive_user_avatars(base_dir: str, users: list[API_User_Short], spinner: Halo):
+    """Archive user profile photos"""
+    reqs, users_to_archive = [], []
+    for user in users:
+        avatar = user["avatar"]
+        if avatar is None or os.path.isfile(f"{base_dir}/avatars/{avatar}.jpg"):
+            continue
+        reqs.append(grequests.get(f"{ED_USER_AVATAR_BASE_URL}/{avatar}"))
+        users_to_archive.append(user)
+
+    dir = f"{base_dir}/avatars"
+    pathlib.Path(dir).mkdir(parents=True, exist_ok=True)
+
+    cnt, total = 1, len(users_to_archive)
+    for i, res in gen_get_requests(reqs):
+        user = users_to_archive[i]
+        spinner.text = f"{cnt}/{total} | {Color.MAGENTA}Archiving user photo: {user["name"]}{Color.NC}"
+        cnt += 1
+
+        f = open(f"{dir}/{user["avatar"]}.jpg", "wb")
+        f.write(res.content)
+        f.close()
 
 
 def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithComments]:
@@ -156,33 +220,24 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
 
     print(f"\n{Color.BLUE}Archiving course: {Color.BOLD}{Color.CYAN}{name}{Color.NC}\n")
 
-    results, cnt = [], 0
+    users = []
+    results, cnt = [], 1
     pathlib.Path(f"{dirname}/original").mkdir(parents=True, exist_ok=True)
     spinner.start()
 
-    for thread_with_user in gen_threads(course["id"]):
-        tid = thread_with_user["id"]
-        dst = f"{dirname}/original/{tid}.json"
-        title_snippet = thread_with_user["title"][:32]
-        cnt += 1
-
-        if os.path.isfile(dst):
-            spinner.text = f"{cnt} | {Color.WARNING}Already archived:{Color.NC} {title_snippet}..."
-            f = open(dst, "r")
-            thread_with_comments = API_Thread_WithComments(json.loads(f.read()))
-            f.close()
-        else:
-            spinner.text = f"{cnt} | {Color.MAGENTA}Archiving thread{Color.NC}: {title_snippet}..."
-            thread_with_comments = ed.get_thread(thread_with_user["id"])
-            f = open(dst, "w")
-            f.write(json.dumps(thread_with_comments, indent=2))
-            f.close()
-
-        thread_json = archive_thread_files(dirname, thread_with_comments, spinner)
-        results.append(json.loads(thread_json))
+    for res in gen_threads(course["id"]):
+        users.extend(res["users"])
+        for thread_with_user in res["threads"]:
+            thread_json = archive_thread(dirname, thread_with_user, spinner, cnt)
+            results.append(json.loads(thread_json))
+            cnt += 1
 
     with open(f"{dirname}/posts.json", "w") as f:
         f.write(json.dumps(results, indent=2))
+
+    archive_user_avatars(dirname, users, spinner)
+    with open(f"{dirname}/users.json", "w") as f:
+        f.write(json.dumps(users, indent=2))
 
     spinner.succeed(f"Successfully archived {len(results)} threads!")
     return results
