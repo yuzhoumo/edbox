@@ -148,7 +148,7 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
         link, pl = links_to_archive[i] # Indices come back in arbitrary order
         filename = extract_filename(res)
         status = f"{cnt}/{total} | {Color.MAGENTA}Archiving file{Color.NC}: {filename}"
-        spinner.text = f"{old_spinner_text} | {status}"
+        spinner.text = f"{old_spinner_text} <<< {status}"
         cnt += 1
 
         dir = f"{base_dir}{pl.path}"
