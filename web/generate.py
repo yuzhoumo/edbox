@@ -1,3 +1,4 @@
+import jinja2
 import pathlib
 import json
 import os
@@ -7,12 +8,12 @@ from edapi.types.api_types.course import API_Course
 from edapi.types.api_types.thread import API_Thread_WithComments, API_User_Short
 
 
-AVATARS_DIR    = "avatars/"
-FILES_DIR      = "files/"
-INFO_FILE      = "info.json"
-USERS_FILE     = "users.json"
-POSTS_FILE     = "posts.json"
-EXPECTED_PATHS = [ AVATARS_DIR, FILES_DIR, INFO_FILE, USERS_FILE, POSTS_FILE ]
+AVATARS_DIR = "avatars/"
+FILES_DIR = "files/"
+INFO_FILE = "info.json"
+USERS_FILE = "users.json"
+POSTS_FILE = "posts.json"
+EXPECTED_PATHS = [AVATARS_DIR, FILES_DIR, INFO_FILE, USERS_FILE, POSTS_FILE]
 
 
 class CourseArchive(TypedDict):
@@ -23,6 +24,7 @@ class CourseArchive(TypedDict):
 
 
 def validate_archive_dir(base_dir: str):
+    """Ensure the expected archive files/directories exist"""
     if not os.path.isdir(base_dir):
         raise FileNotFoundError(f"Invalid base directory: {base_dir}")
     for e in EXPECTED_PATHS:
@@ -32,6 +34,7 @@ def validate_archive_dir(base_dir: str):
 
 
 def read_course_archive(base_dir: str) -> CourseArchive:
+    """Deserialize course data from archived files"""
     validate_archive_dir(base_dir)
     with open(f"{base_dir}/{INFO_FILE}", "r") as f:
         info: API_Course = json.loads(f.read())
@@ -48,10 +51,22 @@ def read_course_archive(base_dir: str) -> CourseArchive:
 
 
 def generate_site(src_dir: str, target_dir: str):
+    """Generate static site from archived data"""
     archive = read_course_archive(src_dir)
-    print(archive)
+
+    templateLoader = jinja2.FileSystemLoader(searchpath="templates")
+    templateEnv = jinja2.Environment(loader=templateLoader)
+
+    main = templateEnv.get_template("main.html.jinja")
+    outputText = main.render(
+        {
+            "posts": json.dumps(archive["posts"]),
+            "users": json.dumps(archive["users"]),
+        }
+    )
+
+    print(outputText)
 
 
 if __name__ == "__main__":
-    archive = read_course_archive("test")
-    print(archive["posts"])
+    generate_site("assets", "")
