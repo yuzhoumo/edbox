@@ -7,10 +7,11 @@ import re
 import edapi
 from urllib.parse import unquote, urlparse
 from halo import Halo
+from web.generate import generate_site
 
 # Type definitions
 from requests import Response
-from typing import Generator
+from typing import Generator, TypedDict
 from edapi.types.api_types.course import API_Course
 from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
 from edapi.types.api_types.endpoints.threads import API_ListThreads_Response
@@ -32,15 +33,16 @@ STARTUP_BANNER = r"""
 
 """
 
-
 class PatchedEdAPI(edapi.EdAPI):
     @edapi.edapi._ensure_login
     def patched_list_threads(
         self, /, course_id: int, *, limit: int = 30, offset: int = 0, sort: str = "new"
     ) -> API_ListThreads_Response:
-
-        from edapi.edapi import API_BASE_URL, _throw_error
-        from edapi.edapi import urljoin
+        """
+        Monkeypatch this in since the original list_threads api omits the
+        users list corresponding to the requested thread.
+        """
+        from edapi.edapi import API_BASE_URL, _throw_error, urljoin
 
         list_url = urljoin(API_BASE_URL, f"courses/{course_id}/threads")
         response = self.session.get(
@@ -169,7 +171,7 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
 def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner: Halo, cnt: int):
     """Archive a single discussion thread"""
     tid = thread_with_user["id"]
-    dst = f"{base_dir}/original/{tid}.json"
+    dst = f"{base_dir}/.cache/{tid}.json"
     title_snippet = thread_with_user["title"][:32]
 
     if os.path.isfile(dst):
@@ -220,9 +222,12 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
 
     print(f"\n{Color.BLUE}Archiving course: {Color.BOLD}{Color.CYAN}{name}{Color.NC}\n")
 
+    with open(f"{dirname}/info.json", "w") as f:
+        f.write(json.dumps(course, indent=2))
+
     users = []
     results, cnt = [], 1
-    pathlib.Path(f"{dirname}/original").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(f"{dirname}/.cache").mkdir(parents=True, exist_ok=True)
     spinner.start()
 
     for res in gen_threads(course["id"]):
@@ -238,6 +243,9 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
     archive_user_avatars(dirname, users, spinner)
     with open(f"{dirname}/users.json", "w") as f:
         f.write(json.dumps(users, indent=2))
+
+    spinner.text = f"{Color.MAGENTA}Generating static site...{Color.NC}"
+    generate_site(dirname, f"{dirname}/web")
 
     spinner.succeed(f"Successfully archived {len(results)} threads!")
     return results
