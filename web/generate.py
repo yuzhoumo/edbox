@@ -1,4 +1,5 @@
 import jinja2
+import minify_html
 import pathlib
 import json
 import os
@@ -57,15 +58,13 @@ def generate_site(src_dir: str, target_dir: str):
     templateLoader = jinja2.FileSystemLoader(searchpath="templates")
     templateEnv = jinja2.Environment(loader=templateLoader)
 
-    main = templateEnv.get_template("main.html.jinja")
-    outputText = main.render(
-        {
-            "posts": json.dumps(archive["posts"]),
-            "users": json.dumps(archive["users"]),
-        }
-    )
+    index = templateEnv.get_template("index.html.jinja")
+    index_out = index.render({
+        "posts": json.dumps(archive["posts"]),
+        "users": json.dumps(archive["users"]),
+    })
 
-    print(outputText)
+    print(minify_html.minify(index_out, minify_css=True, remove_processing_instructions=True))
 
 
 if __name__ == "__main__":
