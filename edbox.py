@@ -11,7 +11,7 @@ from web.generate import generate_site
 
 # Type definitions
 from requests import Response
-from typing import Generator, TypedDict
+from typing import Generator
 from edapi.types.api_types.course import API_Course
 from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
 from edapi.types.api_types.endpoints.threads import API_ListThreads_Response
@@ -219,33 +219,34 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
     dirname = name.replace("/", " ")
     dirname = "".join(c for c in dirname if c.isalnum() or c == " ")
     dirname = f"{OUT_DIR}/{dirname.lower().strip().replace(" ", "-")}"
+    assets_dir = f"{dirname}/assets"
 
     print(f"\n{Color.BLUE}Archiving course: {Color.BOLD}{Color.CYAN}{name}{Color.NC}\n")
 
-    with open(f"{dirname}/info.json", "w") as f:
+    with open(f"{assets_dir}/info.json", "w") as f:
         f.write(json.dumps(course, indent=2))
 
     users = []
     results, cnt = [], 1
-    pathlib.Path(f"{dirname}/.cache").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(f"{assets_dir}/.cache").mkdir(parents=True, exist_ok=True)
     spinner.start()
 
     for res in gen_threads(course["id"]):
         users.extend(res["users"])
         for thread_with_user in res["threads"]:
-            thread_json = archive_thread(dirname, thread_with_user, spinner, cnt)
+            thread_json = archive_thread(assets_dir, thread_with_user, spinner, cnt)
             results.append(json.loads(thread_json))
             cnt += 1
 
-    with open(f"{dirname}/posts.json", "w") as f:
+    with open(f"{assets_dir}/posts.json", "w") as f:
         f.write(json.dumps(results, indent=2))
 
-    archive_user_avatars(dirname, users, spinner)
-    with open(f"{dirname}/users.json", "w") as f:
+    archive_user_avatars(assets_dir, users, spinner)
+    with open(f"{assets_dir}/users.json", "w") as f:
         f.write(json.dumps(users, indent=2))
 
     spinner.text = f"{Color.MAGENTA}Generating static site...{Color.NC}"
-    generate_site(dirname, f"{dirname}/web")
+    generate_site(assets_dir, dirname)
 
     spinner.succeed(f"Successfully archived {len(results)} threads!")
     return results
