@@ -1,0 +1,46 @@
+@font-face {
+  font-family: horatio;
+    src: url("horatio-d-medium.otf");
+  }
+
+  ::-webkit-scrollbar {
+    width: 16px; /* Consistent width for the scrollbar */
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f3f4f6; /* Light background color for the track in light mode */
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #9ca3af; /* Slightly darker thumb for contrast in light mode */
+    border-radius: 8px; /* Rounded corners for the thumb */
+    border: 4px solid #f3f4f6; /* Light border to blend with the track */
+	min-height: 32px;
+  }
+
+  /* Adjustments for a darker scrollbar in dark mode */
+  @media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: #2e2e2e; /* Much darker background for the track in dark mode */
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #4b5563; /* Darker thumb for a subtle contrast */
+    border: 4px solid #2e2e2e; /* Dark border to blend seamlessly with the track */
+  }
+}
+
+/* If using Tailwind's dark mode class for manual dark mode toggling */
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937; /* Darker track color for manual dark mode */
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* Darker thumb color for manual dark mode */
+  border: 4px solid #1f2937; /* Matching dark border for a cohesive look */
+}
+
+.logo-font {
+  font-family: horatio;
+  font-size: 1.5em;
+}
