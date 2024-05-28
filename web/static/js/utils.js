@@ -76,9 +76,31 @@ var getAvatar = (post, userMap) => {
   return avatar ? "assets/avatars/" + avatar + ".jpg" : "";
 }
 
+/* Anonymous avatar fallback image */
+var IMG_ANON_AVATAR =
+  "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4w" +
+  "IiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+Cj" +
+  "whRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcg" +
+  "MS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1" +
+  "NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+Cjxzdmcgd2lkdGg9IjEw" +
+  "MCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEwMCAxMD" +
+  "AiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMu" +
+  "b3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy" +
+  "53My5vcmcvMTk5OS94bGluayIgeG1sOnNwYWNlPSJwcmVzZXJ2" +
+  "ZSIgeG1sbnM6c2VyaWY9Imh0dHA6Ly93d3cuc2VyaWYuY29tLy" +
+  "Igc3R5bGU9ImZpbGwtcnVsZTpldmVub2RkO2NsaXAtcnVsZTpl" +
+  "dmVub2RkO3N0cm9rZS1saW5lam9pbjpyb3VuZDtzdHJva2UtbW" +
+  "l0ZXJsaW1pdDoyOyI+CiAgICA8ZWxsaXBzZSBjeD0iNTAiIGN5" +
+  "PSIzOSIgcng9IjIxLjI2OCIgcnk9IjI1LjE2NyIgc3R5bGU9Im" +
+  "ZpbGw6d2hpdGU7ZmlsbC1vcGFjaXR5OjAuMjsiLz4KICAgIDxw" +
+  "YXRoIGQ9Ik05My4xNTQsMTAwQzkwLjMxNiw4NSA3Mi4wODQsNz" +
+  "MuNSA1MCw3My41QzI3LjkxNiw3My41IDkuNjgzLDg1IDYuODQ2" +
+  "LDEwMEw5My4xNTQsMTAwWiIgc3R5bGU9ImZpbGw6d2hpdGU7Zm" +
+  "lsbC1vcGFjaXR5OjAuMjtmaWxsLXJ1bGU6bm9uemVybzsiLz4K" +
+  "PC9zdmc+Cg==";
+
 /* Get abbreviated name as backup avatar */
-var getNameAbbrev = (post, userMap) => {
-  const name = userMap[post.user_id].name;
+var getNameAbbrev = (post, userMap) => { const name = userMap[post.user_id].name;
   return name.split(" ").map(n => n.substring(0, 1)).join("").toUpperCase();
 }
 
