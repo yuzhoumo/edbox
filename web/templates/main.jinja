@@ -60,9 +60,14 @@
           <img class="size-10 rounded-full" :src="getAvatar(currentPost, userMap)" alt="user avatar">
         </template>
         <template x-if="!currentPost.is_anonymous && !getAvatar(currentPost, userMap)">
-          <div class="relative inline-flex items-center justify-center w-10 h-10 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-600">
+          <div
+            :class="cn([
+              'relative inline-flex items-center justify-center size-10 overflow-hidden rounded-full',
+              `bg-[${getColor(currentPost.user_id, false)}]`
+            ])"
+          >
             <span
-              class="font-light text-gray-600 dark:text-gray-300"
+              class="font-light text-white"
               x-text="getNameAbbrev(currentPost, userMap)"
             ></span>
           </div>
