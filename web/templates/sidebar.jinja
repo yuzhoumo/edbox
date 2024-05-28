@@ -50,7 +50,10 @@
           <!-- sidebar item body -->
           <div class="flex flex-row items-center gap-2 w-full">
             <span
-              class="text-xs font-semibold"
+              :class="cn([
+                'text-xs font-semibold text',
+                `text-[${getColor(post.category, true)}]`
+              ])"
               x-text="post.category + (post.subcategory ? ' - ' + post.subcategory : '')"
             ></span>
             <span

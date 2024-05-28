@@ -74,9 +74,8 @@
         </template>
 
         <div class="flex flex-col">
-          <div class="flex gap-1 font-light dark:text-white items-center">
-            <span x-text="currentPost.is_anonymous ? 'Anonymous' : getAuthorName(currentPost, userMap)"></span>
-            <span class="text-sm text-gray-500 dark:text-gray-400"></span>
+          <div class="flex gap-1 font-light text-white items-center">
+            <span class="text-[#ff8c66]" x-text="currentPost.is_anonymous ? 'Anonymous' : getAuthorName(currentPost, userMap)"></span>
             <span
               class="text-[0.5rem] font-semibold bg-[#372dad] rounded-md px-1 py-[2px]"
               x-show="!currentPost.is_anonymous && userMap[currentPost.user_id].course_role === 'admin'"
@@ -85,10 +84,15 @@
             </span>
           </div>
 
-          <span
-            class="text-xs text-semibold"
-            x-text="'Posted in ' + getFullCategory(currentPost)"
-          ></span>
+          <div class="flex gap-1 items-baseline">
+            <span class="text-xs text-semibold" >Posted in </span>
+            <span
+              :class="cn([
+                'text-xs text-semibold', `text-[${getColor(currentPost.category, true)}]`
+              ])"
+              x-text="getFullCategory(currentPost)"
+            ></span>
+          </div>
         </div>
       </div>
 

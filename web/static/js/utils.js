@@ -57,25 +57,17 @@ var getColor = (str, isPrimary) => {
     "#1abc9c", // Turquoise
     "#2ecc71", // Emerald
     "#3498db", // Peter River
-    "#9b59b6", // Amethyst
-    "#34495e", // Wet Asphalt
     "#f1c40f", // Sun Flower
     "#e67e22", // Carrot
     "#e74c3c", // Alizarin
-    "#ecf0f1", // Clouds
-    "#95a5a6"  // Concrete
   ];
   const variantColors = [
     "#16a085", // Green Sea
     "#27ae60", // Nephritis
     "#2980b9", // Belize Hole
-    "#8e44ad", // Wisteria
-    "#2c3e50", // Midnight Blue
     "#f39c12", // Orange
     "#d35400", // Pumpkin
     "#c0392b", // Pomegranate
-    "#bdc3c7", // Silver
-    "#7f8c8d"  // Asbestos
   ];
   const colors = isPrimary ? primaryColors : variantColors;
   return colors[djb2(String(str)) % primaryColors.length];
