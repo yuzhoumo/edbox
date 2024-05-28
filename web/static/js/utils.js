@@ -120,9 +120,9 @@ var getFullCategory = (post) => {
 }
 
 /* Flatten comment tree into one list, with depth information */
-var flattenComments = (post) => {
+var flattenComments = (comments) => {
   let res = [];
-  let stack = [...(post.comments.map(c => [0, c]))];
+  let stack = [...(comments.map(c => [0, c]))];
 
   while (stack.length > 0) {
     let [depth, c] = stack.pop();

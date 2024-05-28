@@ -103,7 +103,7 @@
         'border-gray-700', 'px-4', 'py-2', 'align-middle'
       ])"
     >
-      <div id="current-post-footer-info" class="flex gap-3 text-xs">
+      <div id="current-post-footer-info" class="flex gap-4 text-xs">
         <div id="current-post-likes" class="flex gap-1 items-center">
           <span class="text-red-400">&hearts;</span>
           <span x-text="currentPost.vote_count + (currentPost.vote_count === 1 ? ' like' : ' likes')"></span>
@@ -123,6 +123,38 @@
     </div>
   </div>
 
-  {{ comments_content }}
+  <div
+    :class="cn([
+      'mx-4', 'my-4', 'py-4', 'rounded-lg', 'border',
+      'border-gray-700', 'bg-gray-800', 'text-white'
+    ])"
+    x-show="currentPost.answers.length > 0"
+  >
+    <!-- post answers -->
+    <h1 class="px-4 pb-4">Answers</h1>
+    <template
+      x-for="item in flattenComments(currentPost.answers)"
+      :key="item[1].id"
+    >
+      {{ comments_content }}
+    </template>
+  </div>
+
+  <div
+    :class="cn([
+      'mx-4', 'my-4', 'py-4', 'rounded-lg', 'border',
+      'border-gray-700', 'bg-gray-800', 'text-white'
+    ])"
+    x-show="currentPost.comments.length > 0"
+  >
+    <!-- post comments -->
+    <h1 class="px-4 pb-4">Comments</h1>
+    <template
+      x-for="item in flattenComments(currentPost.comments)"
+      :key="item[1].id"
+    >
+      {{ comments_content }}
+    </template>
+  </div>
 
 </div>
