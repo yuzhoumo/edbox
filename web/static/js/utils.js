@@ -3,11 +3,6 @@ var cn = (classnames) => {
   return classnames.join(" ");
 }
 
-/* Check if post contains inline latex */
-var containsInlineLatex = (post) => {
-  return JSON.stringify(post).includes("$$");
-}
-
 /* Convert anon id to name (reverse engineered from ed) */
 var getAnonymousName = (anonId) => {
   const djb2 = (string) => {
@@ -133,4 +128,20 @@ var flattenComments = (comments) => {
   }
 
   return res;
+}
+
+/* Check if post contains inline latex */
+var containsInlineLatex = (post) => {
+  const s = JSON.stringify(post);
+  return s.includes("<math>") || s.includes("$");
+}
+
+/* Replace any <math> tags with latex delimiter $$*/
+function replaceMathTags() {
+  document.querySelectorAll('math').forEach((math) => {
+    const texContent = math.textContent;
+    const span = document.createElement('span');
+    span.innerHTML = `$$${texContent}$$`;
+    math.replaceWith(span);
+  });
 }

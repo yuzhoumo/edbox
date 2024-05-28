@@ -23,7 +23,7 @@
         'w-full', 'rounded-md', 'bg-green-400', 'px-2', 'py-1',
         'text-sm', 'text-green-900', 'hover:bg-green-500'
       ])"
-      x-on:click="shown = false; MathJax.typesetPromise()"
+      x-on:click="shown = false; replaceMathTags(); MathJax.typesetPromise()"
     >
       Click here to show LaTeX
     </button>
@@ -126,7 +126,8 @@
   <div
     :class="cn([
       'mx-4', 'my-4', 'py-4', 'rounded-lg', 'border',
-      'border-gray-700', 'bg-gray-800', 'text-white'
+      'border-gray-700', 'bg-gray-800', 'text-white',
+      'overflow-x-auto'
     ])"
     x-show="currentPost.answers.length > 0"
   >
@@ -143,7 +144,8 @@
   <div
     :class="cn([
       'mx-4', 'my-4', 'py-4', 'rounded-lg', 'border',
-      'border-gray-700', 'bg-gray-800', 'text-white'
+      'border-gray-700', 'bg-gray-800', 'text-white',
+      'overflow-x-auto'
     ])"
     x-show="currentPost.comments.length > 0"
   >
