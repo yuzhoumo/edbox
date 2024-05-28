@@ -14,7 +14,7 @@ from requests import Response
 from typing import Generator
 from edapi.types.api_types.course import API_Course
 from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
-from edapi.types.api_types.endpoints.threads import API_ListThreads_Response
+from edapi.types.api_types.endpoints.threads import API_ListThreads_Response, API_GetThread_Response
 from edapi.types import EdError
 type ThreadGenerator = Generator[API_ListThreads_Response, None, None]
 type RequestGenerator = Generator[tuple[int, Response], None, None]
@@ -55,7 +55,25 @@ class PatchedEdAPI(edapi.EdAPI):
             f"Failed to list threads for course {course_id}.", response.content
         )
 
+    @edapi.edapi._ensure_login
+    def patched_get_thread(self, thread_id: int) -> API_GetThread_Response:
+        """
+        Monkeypatch this in since the original get_thread api omits the users
+        list corresponding to the requested thread.
+        """
+        from edapi.edapi import API_BASE_URL, _throw_error, urljoin
+
+        thread_url = urljoin(API_BASE_URL, f"threads/{thread_id}")
+        response = self.session.get(thread_url)
+        if response.ok:
+            response_json: API_GetThread_Response = response.json()
+            return response_json
+
+        _throw_error(f"Failed to get thread {thread_id}.", response.content)
+
+
 ed = PatchedEdAPI() # Global ed client
+
 
 class Color:
     MAGENTA   = '\033[95m'
@@ -168,7 +186,7 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
     return thread_json
 
 
-def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner: Halo, cnt: int):
+def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner: Halo, cnt: int) -> tuple[str, list[API_User_Short]]:
     """Archive a single discussion thread"""
     tid = thread_with_user["id"]
     dst = f"{base_dir}/.cache/{tid}.json"
@@ -177,16 +195,16 @@ def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner
     if os.path.isfile(dst):
         spinner.text = f"{cnt} | {Color.WARNING}Already archived:{Color.NC} {title_snippet}..."
         f = open(dst, "r")
-        thread_with_comments = API_Thread_WithComments(json.loads(f.read()))
+        thread = API_GetThread_Response(json.loads(f.read()))
         f.close()
     else:
         spinner.text = f"{cnt} | {Color.MAGENTA}Archiving thread{Color.NC}: {title_snippet}..."
-        thread_with_comments = ed.get_thread(thread_with_user["id"])
+        thread = ed.patched_get_thread(thread_with_user["id"])
         f = open(dst, "w")
-        f.write(json.dumps(thread_with_comments, indent=2))
+        f.write(json.dumps(thread, indent=2))
         f.close()
 
-    return archive_thread_files(base_dir, thread_with_comments, spinner)
+    return archive_thread_files(base_dir, thread["thread"], spinner), thread["users"]
 
 
 def archive_user_avatars(base_dir: str, users: list[API_User_Short], spinner: Halo):
@@ -219,7 +237,9 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
     dirname = name.replace("/", " ")
     dirname = "".join(c for c in dirname if c.isalnum() or c == " ")
     dirname = f"{OUT_DIR}/{dirname.lower().strip().replace(" ", "-")}"
+
     assets_dir = f"{dirname}/assets"
+    pathlib.Path(assets_dir).mkdir(parents=True, exist_ok=True)
 
     print(f"\n{Color.BLUE}Archiving course: {Color.BOLD}{Color.CYAN}{name}{Color.NC}\n")
 
@@ -234,7 +254,8 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
     for res in gen_threads(course["id"]):
         users.extend(res["users"])
         for thread_with_user in res["threads"]:
-            thread_json = archive_thread(assets_dir, thread_with_user, spinner, cnt)
+            thread_json, thread_users = archive_thread(assets_dir, thread_with_user, spinner, cnt)
+            users.extend(thread_users)
             results.append(json.loads(thread_json))
             cnt += 1
 
