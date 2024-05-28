@@ -61,3 +61,38 @@ var formatDate = (dateStr) => {
   const year = date.getFullYear().toString().substring(2, 4);
   return `${month}/${day}/${year}`;
 };
+
+/* Get author from post */
+var getAuthorName = (post, userMap) => {
+  if (post.is_anonymous) {
+    return getAnonymousName(post.anonymous_id);
+  }
+  return userMap[post.user_id].name;
+}
+
+/* Get author avatar url from post */
+var getAvatar = (post, userMap) => {
+  const avatar = userMap[post.user_id].avatar;
+  return avatar ? "assets/avatars/" + avatar + ".jpg" : "";
+}
+
+/* Get abbreviated name as backup avatar */
+var getNameAbbrev = (post, userMap) => {
+  const name = userMap[post.user_id].name;
+  return name.split(" ").map(n => n.substring(0, 1)).join("").toUpperCase();
+}
+
+/* Get full post category text */
+var getFullCategory = (post) => {
+  let res = "";
+  if (post.category) {
+    res += post.category;
+  }
+  if (post.subcategory) {
+    res += " - " + post.subcategory;
+  }
+  if (post.subsubcategory) {
+    res += " - " + post.subsubcategory;
+  }
+  return res;
+}

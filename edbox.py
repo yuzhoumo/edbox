@@ -163,7 +163,7 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
     for link, pl in zip(links, parsed_links):
         path = f"{base_dir}{pl.path}"
         filename = os.listdir(path)[0]
-        thread_json = thread_json.replace(link, f"{pl.path.strip("/")}/{filename}")
+        thread_json = thread_json.replace(link, f"assets/{pl.path.strip("/")}/{filename}")
 
     return thread_json
 

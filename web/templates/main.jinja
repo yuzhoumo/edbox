@@ -1,0 +1,131 @@
+<!-- main section for displaying current post -->
+<div
+  id="grid-column-current-post"
+  :class="cn([
+    'col-span-6', 'lg:col-span-3', 'h-[100vh]', 'space-y-4',
+    'overflow-y-auto', 'bg-gray-900', 'pb-4'
+  ])"
+  x-init="$watch('$store.data.currentPost', (p) => { currentPost = p })"
+  x-data="{
+    currentPost: $store.data.currentPost, userMap: getUsers()
+  }"
+>
+  <!-- button for triggering latex typesetting -->
+  <div
+    id="container-btn-typeset-latex"
+    class="px-4 pt-4" x-data="{ shown: containsInlineLatex(currentPost) }"
+    x-effect="shown = containsInlineLatex(currentPost)"
+    x-show="shown"
+  >
+    <button
+      id="btn-typeset-latex"
+      :class="cn([
+        'w-full', 'rounded-md', 'bg-green-400', 'px-2', 'py-1',
+        'text-sm', 'text-green-900', 'hover:bg-green-500'
+      ])"
+      x-on:click="shown = false; MathJax.typesetPromise()"
+    >
+      Click here to show LaTeX
+    </button>
+  </div>
+
+  <!-- main post content -->
+  <div
+    id="main-post"
+    :class="cn([
+      'mx-4', 'mt-4', 'rounded-lg', 'border',
+      'border-gray-700', 'bg-gray-800', 'text-white'
+    ])"
+  >
+    <div class="space-y-8 p-8">
+      <div
+        id="main-post-header"
+        class="flex gap-4 text-2xl font-light items-end"
+      >
+        <span
+          id="main-post-title"
+          x-text="currentPost.title"
+        ></span>
+        <span
+          class="text-xl text-gray-400 font-thin"
+          x-text="' #' + currentPost.number"
+        ></span>
+      </div>
+
+      <!-- post author profile -->
+      <div id="user-avatar" class="flex items-center gap-2">
+
+        <!-- anon profile avatar -->
+        <template x-if="currentPost.is_anonymous">
+          <img class="size-10 rounded-full bg-gray-600" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+Cjxzdmcgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgeG1sbnM6c2VyaWY9Imh0dHA6Ly93d3cuc2VyaWYuY29tLyIgc3R5bGU9ImZpbGwtcnVsZTpldmVub2RkO2NsaXAtcnVsZTpldmVub2RkO3N0cm9rZS1saW5lam9pbjpyb3VuZDtzdHJva2UtbWl0ZXJsaW1pdDoyOyI+CiAgICA8ZWxsaXBzZSBjeD0iNTAiIGN5PSIzOSIgcng9IjIxLjI2OCIgcnk9IjI1LjE2NyIgc3R5bGU9ImZpbGw6d2hpdGU7ZmlsbC1vcGFjaXR5OjAuMjsiLz4KICAgIDxwYXRoIGQ9Ik05My4xNTQsMTAwQzkwLjMxNiw4NSA3Mi4wODQsNzMuNSA1MCw3My41QzI3LjkxNiw3My41IDkuNjgzLDg1IDYuODQ2LDEwMEw5My4xNTQsMTAwWiIgc3R5bGU9ImZpbGw6d2hpdGU7ZmlsbC1vcGFjaXR5OjAuMjtmaWxsLXJ1bGU6bm9uemVybzsiLz4KPC9zdmc+Cg==" draggable="false" aria-hidden="true">
+        </template>
+
+        <!-- user profile avatar -->
+        <template x-if="!currentPost.is_anonymous && getAvatar(currentPost, userMap)">
+          <img class="size-10 rounded-full" :src="getAvatar(currentPost, userMap)" alt="user avatar">
+        </template>
+
+        <-- user profile fallback avatar (user initials) -->
+        <template x-if="!currentPost.is_anonymous && !getAvatar(currentPost, userMap)">
+          <div class="relative inline-flex items-center justify-center w-10 h-10 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-600">
+            <span
+              class="font-light text-gray-600 dark:text-gray-300"
+              x-text="getNameAbbrev(currentPost, userMap)"
+            ></span>
+          </div>
+        </template>
+
+        <div class="flex flex-col">
+          <!-- staff tag -->
+          <div class="flex gap-1 font-light dark:text-white items-center">
+            <span x-text="getAuthorName(currentPost, userMap)"></span>
+            <span class="text-sm text-gray-500 dark:text-gray-400"></span>
+            <span
+              class="text-[0.5rem] font-semibold bg-[#372dad] rounded-md px-1 py-[2px]"
+              x-show="!currentPost.is_anonymous && userMap[currentPost.user_id].course_role === 'admin'"
+            >
+              STAFF
+            </span>
+          </div>
+
+          <!-- post category -->
+          <span
+            class="text-xs text-semibold"
+            x-text="'Posted in ' + getFullCategory(currentPost)"
+          ></span>
+        </div>
+      </div>
+
+      <div id="main-post-body" class="overflow-x-auto">
+        <span
+          id="main-post-content"
+          class="space-y-2 text-sm"
+          x-html="currentPost.document"
+        ></span>
+      </div>
+    </div>
+
+    <div
+      id="main-post-footer"
+      :class="cn([
+        'flex', 'w-full', 'justify-between', 'border-t',
+        'border-gray-700', 'px-4', 'py-2', 'align-middle'
+      ])"
+    >
+      <span
+        id="main-post-likes"
+        class="text-xs text-blue-300"
+        x-text="'good ' + currentPost.type + ' | ' + currentPost.vote_count"
+      ></span>
+      <span
+        id="main-post-last-updated-by"
+        class="text-xs"
+        x-html="
+          'Last updated ' + formatDate(currentPost.updated_at) +
+          ' by <b>' + (currentPost.is_anonymous ? 'Anonymous' :
+          userMap[currentPost.user_id].name) + '</b>'
+        "
+      ></span>
+    </div>
+  </div>
+</div>
