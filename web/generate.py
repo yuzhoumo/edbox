@@ -60,6 +60,8 @@ def transform_documents_to_html(posts: list[API_Thread_WithComments]) -> list[AP
 
 def copy_and_overwrite(from_path, to_path):
     """Recursively copy and overwrite directory"""
+    if os.path.samefile(from_path, to_path):
+        return
     if os.path.exists(to_path):
         shutil.rmtree(to_path)
     shutil.copytree(from_path, to_path)
