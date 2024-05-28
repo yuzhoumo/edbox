@@ -37,6 +37,35 @@
 
 /* CSS for the custom ed document format */
 document {
+	heading[level="1"] {
+		font-size: 1.75em;
+		font-weight: bold;
+	}
+
+	heading[level="2"] {
+		font-size: 1.5em;
+		font-weight: bold;
+	}
+
+	heading[level="3"] {
+		font-size: 1.25em;
+		font-weight: bold;
+	}
+
+	heading[level="4"] {
+		font-size: 1em;
+		font-weight: bold;
+	}
+
+	heading[level="5"] {
+		font-size: 0.75em;
+		font-weight: bold;
+	}
+
+	heading[level="6"] {
+		font-size: 0.5em;
+		font-weight: bold;
+	}
 	p {
 		display: block;  /* Ensure the div is block-level */
 		margin-top: 0.5em; /* Apply top margin */
