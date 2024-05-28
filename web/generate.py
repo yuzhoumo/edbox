@@ -7,7 +7,7 @@ import os
 
 from typing import TypedDict
 from edapi.types.api_types.course import API_Course
-from edapi.types.api_types.thread import API_Thread_WithComments, API_User_Short
+from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_Comment, API_User_Short
 
 
 AVATARS_DIR = "avatars/"

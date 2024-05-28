@@ -103,16 +103,13 @@
         'border-gray-700', 'px-4', 'py-2', 'align-middle'
       ])"
     >
-      <div class="flex gap-1 items-center">
-        <span
-          id="main-post-likes"
-          class="text-xs text-red-400"
-        >&hearts;</span>
-        <span
-          id="main-post-likes"
-          class="text-xs"
-          x-text="currentPost.vote_count"
-        ></span>
+      <div id="current-post-footer-info" class="flex gap-3 text-xs">
+        <div id="current-post-likes" class="flex gap-1 items-center">
+          <span class="text-red-400">&hearts;</span>
+          <span x-text="currentPost.vote_count + (currentPost.vote_count === 1 ? ' like' : ' likes')"></span>
+        </div>
+        <span x-text="currentPost.view_count + ' total views'"></span>
+        <span x-text="currentPost.unique_view_count + ' unique views'"></span>
       </div>
       <span
         id="main-post-last-updated-by"
@@ -133,66 +130,80 @@
     ])"
     x-show="currentPost.comments.length > 0"
   >
-    <!-- followup discussions -->
+    <!-- post comments -->
     <template
-      x-for="followup in currentPost.comments"
-      :key="followup.id"
+      x-for="item in flattenComments(currentPost)"
+      :key="item[1].id"
     >
-      <!-- comment outer container -->
-      <div
-        class="px-6 py-4"
-      >
-        <!-- comment inner container -->
-        <div class="flex flex-row gap-x-2 align-top">
-          <!-- comment profile picture -->
-          <div class="min-w-10">
-            <template x-if="followup.is_anonymous">
-              <img class="size-10 rounded-full bg-gray-600" :src="IMG_ANON_AVATAR" draggable="false" aria-hidden="true">
-            </template>
-            <template x-if="!followup.is_anonymous && getAvatar(followup, userMap)">
-              <img class="size-10 rounded-full" :src="getAvatar(followup, userMap)" alt="user avatar">
-            </template>
-            <template x-if="!followup.is_anonymous && !getAvatar(followup, userMap)">
-              <div class="relative inline-flex items-center justify-center size-10 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-600">
-                <span
-                  class="font-light text-gray-600 dark:text-gray-300"
-                  x-text="getNameAbbrev(followup, userMap)"
-                ></span>
-              </div>
-            </template>
-          </div>
+      <div class="flex gap-2">
 
-          <div class="space-y-1 overflow-x-auto">
-            <!-- comment header -->
-            <div class="flex gap-2 text-sm font-light items-baseline pb-2">
-              <!-- TODO: comment staff tag -->
+        <!-- comment indentation guide -->
+        <template
+          x-for="_ in Array(item[0])"
+        >
+          <span class="size-10"></span>
+        </template>
 
-              <!-- comment username -->
-              <span
-                x-text="getAuthorName(followup, userMap)"
-              ></span>
-
-              <!-- comment date -->
-              <span
-                class="text-xs"
-                x-text="formatDate(followup.created_at)"
-              ></span>
+        <!-- comment outer container -->
+        <div class="px-6 py-4" >
+          <!-- comment inner container -->
+          <div class="flex flex-row gap-x-2 align-top">
+            <!-- comment profile picture -->
+            <div class="min-w-10">
+              <template x-if="item[1].is_anonymous">
+                <img class="size-10 rounded-full bg-gray-600" :src="IMG_ANON_AVATAR" draggable="false" aria-hidden="true">
+              </template>
+              <template x-if="!item[1].is_anonymous && getAvatar(item[1], userMap)">
+                <img class="size-10 rounded-full" :src="getAvatar(item[1], userMap)" alt="user avatar">
+              </template>
+              <template x-if="!item[1].is_anonymous && !getAvatar(item[1], userMap)">
+                <div class="relative inline-flex items-center justify-center size-10 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-600">
+                  <span
+                    class="font-light text-gray-600 dark:text-gray-300"
+                    x-text="getNameAbbrev(item[1], userMap)"
+                  ></span>
+                </div>
+              </template>
             </div>
 
-            <!-- comment content -->
-            <span
-              class="text-sm font-light"
-              x-html="followup.content"
-            ></span>
+            <div class="space-y-1 overflow-x-auto">
+              <!-- comment header -->
+              <div class="flex gap-2 text-sm font-light items-baseline pb-2">
+                <!-- comment username -->
+                <div class="flex items-center gap-1">
+                  <span
+                    x-text="getAuthorName(item[1], userMap)"
+                  ></span>
+                  <span
+                    class="text-[0.5rem] font-semibold bg-[#372dad] rounded-md px-1"
+                    x-show="!item[1].is_anonymous && userMap[item[1].user_id].course_role === 'admin'"
+                  >
+                    STAFF
+                  </span>
+                </div>
 
-            <!-- comment likes -->
-            <div :id="followup.id + '-comment-likes'" class="flex gap-1 items-center text-xs">
+                <!-- comment date -->
+                <span
+                  class="text-xs"
+                  x-text="formatDate(item[1].created_at)"
+                ></span>
+              </div>
+
+              <!-- comment content -->
               <span
-                class="text-red-400"
-              >&hearts;</span>
-              <span
-                x-text="followup.vote_count"
+                class="text-sm font-light"
+                x-html="item[1].content"
               ></span>
+
+              <!-- comment likes -->
+              <div :id="item[1].id + '-comment-likes'" class="flex gap-1 items-center text-xs">
+                <span
+                  class="text-red-400"
+                >&hearts;</span>
+                <span
+                  x-text="item[1].vote_count"
+                ></span>
+              </div>
             </div>
           </div>
         </div>

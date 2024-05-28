@@ -118,3 +118,19 @@ var getFullCategory = (post) => {
   }
   return res;
 }
+
+/* Flatten comment tree into one list, with depth information */
+var flattenComments = (post) => {
+  let res = [];
+  let stack = [...(post.comments.map(c => [0, c]))];
+
+  while (stack.length > 0) {
+    let [depth, c] = stack.pop();
+    res.push([depth, c]);
+    c.comments.forEach((subc) => {
+      stack.push([depth + 1, subc]);
+    });
+  }
+
+  return res;
+}
