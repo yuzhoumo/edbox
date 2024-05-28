@@ -77,24 +77,27 @@ def generate_site(src_dir: str, target_dir: str):
     templateEnv = jinja2.Environment(loader=templateLoader)
 
     sidebar = templateEnv.get_template("sidebar.jinja")
+    comments = templateEnv.get_template("comments.jinja")
     main = templateEnv.get_template("main.jinja")
     index = templateEnv.get_template("index.jinja")
 
-    index_out = index.render({
+    webpage = index.render({
         "posts": json.dumps(archive["posts"]),
         "users": json.dumps(archive["users"]),
         "sidebar_content": sidebar.render(),
-        "main_content": main.render(),
+        "main_content": main.render({
+            "comments_content": comments.render()
+        }),
     })
 
-    minified = minify_html.minify(
-        index_out,
+    webpage = minify_html.minify(
+        webpage,
         minify_css=True,
         remove_processing_instructions=True
     )
 
     with open(f"{target_dir}/index.html", "w") as f:
-        f.write(minified)
+        f.write(webpage)
 
     copy_and_overwrite(f"{dir_path}/static", f"{target_dir}/static")
 
