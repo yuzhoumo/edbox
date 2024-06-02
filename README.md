@@ -37,8 +37,20 @@ archiving, restart the program and it will pick up where it left off.
 
 ## Development
 
-If you would like to modify the web directory, please note that you may need
-to regnerate the included tailwind.css file (see tailwind docs).
+There is no need to manually build or install dev dependencies for the webpage
+unless you are making changes to it.
+
+1. Install development dependencies:
+
+```sh
+cd web
+pnpm install
+```
+
+2. Add assets downloaded by edbox.py to `web/build/assets`.
+3. Build the site using `pnpm run build`. This generates the `index.html` file
+   and rebuilds the `web/static/tailwind.css` file.
+4. Open `web/build/index.html` to view your changes.
 
 ## Acknowledgements
 - [smartspot2's Ed API](https://github.com/smartspot2/edapi)

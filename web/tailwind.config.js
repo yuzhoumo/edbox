@@ -1,0 +1,51 @@
+module.exports = {
+  content: [
+    "./**/*.{html,js,css}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        "flatui-primary-turquoise": "#1abc9c",
+        "flatui-primary-emerald": "#2ecc71",
+        "flatui-primary-peter-river": "#3498db",
+        "flatui-primary-sun-flower": "#f1c40f",
+        "flatui-primary-carrot": "#e67e22",
+        "flatui-primary-alizarin": "#e74c3c",
+        "flatui-variant-green-sea": "#16a085",
+        "flatui-variant-nephritis": "#27ae60",
+        "flatui-variant-belize-hole": "#2980b9",
+        "flatui-variant-orange": "#f39c12",
+        "flatui-variant-pumpkin": "#d35400",
+        "flatui-variant-pomegranate": "#c0392b",
+      },
+    },
+    safelist: [
+      'bg-flatui-primary-turquoise',
+      'bg-flatui-primary-emerald',
+      'bg-flatui-primary-peter-river',
+      'bg-flatui-primary-sun-flower',
+      'bg-flatui-primary-carrot',
+      'bg-flatui-primary-alizarin',
+      'bg-flatui-variant-green-sea',
+      'bg-flatui-variant-nephritis',
+      'bg-flatui-variant-belize-hole',
+      'bg-flatui-variant-orange',
+      'bg-flatui-variant-pumpkin',
+      'bg-flatui-variant-pomegranate',
+      'text-flatui-primary-turquoise',
+      'text-flatui-primary-emerald',
+      'text-flatui-primary-peter-river',
+      'text-flatui-primary-sun-flower',
+      'text-flatui-primary-carrot',
+      'text-flatui-primary-alizarin',
+      'text-flatui-variant-green-sea',
+      'text-flatui-variant-nephritis',
+      'text-flatui-variant-belize-hole',
+      'text-flatui-variant-orange',
+      'text-flatui-variant-pumpkin',
+      'text-flatui-variant-pomegranate'
+    ]
+  },
+  variants: {},
+  plugins: [],
+}
