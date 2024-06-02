@@ -3,6 +3,7 @@ import minify_html
 import pathlib
 import json
 import shutil
+import sys
 import os
 import re
 
@@ -96,7 +97,7 @@ def transform_documents_to_html(posts):
 
 def copy_and_overwrite(from_path, to_path):
     """Recursively copy and overwrite directory"""
-    if os.path.samefile(from_path, to_path):
+    if os.path.exists(to_path) and os.path.samefile(from_path, to_path):
         return
     if os.path.exists(to_path):
         shutil.rmtree(to_path)
@@ -139,5 +140,7 @@ def generate_site(src_dir: str, target_dir: str):
 
 
 if __name__ == "__main__":
-    generate_site("assets", "./")
+    # usage: python3 generate.py [ASSETS_DIR] [OUTPUT_DIR]
+    assert len(sys.argv) == 3, f"Expected 3 arguments, got {len(sys.argv)}"
+    generate_site(sys.argv[1], sys.argv[2])
 
