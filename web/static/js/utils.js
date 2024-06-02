@@ -51,26 +51,28 @@ var getAnonymousName = (anonId) => {
 }
 
 /* Select a primary color based on an id's hash */
-var getColor = (str, isPrimary) => {
-  // flat ui colors palette
+const getColor = (str, isPrimary) => {
+  // flatui colors palette names
+  // defined in tailwind.config.js
   const primaryColors = [
-    "#1abc9c", // Turquoise
-    "#2ecc71", // Emerald
-    "#3498db", // Peter River
-    "#f1c40f", // Sun Flower
-    "#e67e22", // Carrot
-    "#e74c3c", // Alizarin
+    "turquoise",   // #1abc9c
+    "emerald",     // #2ecc71
+    "peter-river", // #3498db
+    "sun-flower",  // #f1c40f
+    "carrot",      // #e67e22
+    "alizarin",    // #e74c3c
   ];
   const variantColors = [
-    "#16a085", // Green Sea
-    "#27ae60", // Nephritis
-    "#2980b9", // Belize Hole
-    "#f39c12", // Orange
-    "#d35400", // Pumpkin
-    "#c0392b", // Pomegranate
+    "green-sea",   // #16a085
+    "nephritis",   // #27ae60
+    "belize-hole", // #2980b9
+    "orange",      // #f39c12
+    "pumpkin",     // #d35400
+    "pomegranate", // #c0392b
   ];
+  const type = isPrimary ? "flatui-primary-" : "flatui-variant-";
   const colors = isPrimary ? primaryColors : variantColors;
-  return colors[djb2(String(str)) % primaryColors.length];
+  return type + colors[djb2(String(str)) % colors.length];
 }
 
 /* Pretty format a date string */
