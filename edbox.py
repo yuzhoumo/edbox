@@ -1,17 +1,19 @@
 import grequests # IMPORTANT: Must be imported before "requests"
+import requests
 import time
 import json
 import pathlib
 import os
 import re
 import edapi
-from urllib.parse import unquote, urlparse
 from halo import Halo
+from datetime import datetime
+from urllib.parse import unquote, urlparse
 from web.generate import generate_site
 
 # Type definitions
 from requests import Response
-from typing import Generator
+from typing import Generator, TextIO
 from edapi.types.api_types.course import API_Course
 from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
 from edapi.types.api_types.endpoints.threads import API_ListThreads_Response, API_GetThread_Response
@@ -24,6 +26,7 @@ type RequestGenerator = Generator[tuple[int, Response], None, None]
 ED_USER_AVATAR_BASE_URL = "https://static.us.edusercontent.com/avatars"
 ED_CDN_REGEX = r"(?:(?:http[s]?://)?(?:static\.us\.edusercontent\.com))/files/[^\\\'\"\s)]*"
 OUT_DIR = "out"
+ERRLOG = "errors.log"
 TIMEOUT_SECONDS = 30
 STARTUP_BANNER = r"""
    ____   _____
@@ -129,14 +132,20 @@ def gen_threads(course_id: int) -> ThreadGenerator:
         chunk = ed.patched_list_threads(course_id, limit=100, offset=offset)
 
 
-def gen_get_requests(reqs: list[grequests.AsyncRequest]) -> RequestGenerator:
+def gen_get_requests(spinner: Halo, reqs: list[grequests.AsyncRequest], log: TextIO) -> RequestGenerator:
     """Generator for fetching files"""
     # Fetch asynchronously, 6 at a time
     for i, res in grequests.imap_enumerated(reqs, size=6):
-        filename = os.path.split(reqs[i].url)[1]
         if res is None:
-            raise ConnectionError(f"Failed to get: {filename}")
-        yield i, res
+            try:
+                timestamp = datetime.now().astimezone().isoformat()
+                msg = f"{timestamp} Failed to get: {reqs[i].url}\n"
+                spinner.fail(msg)
+                log.write(msg)
+            except IOError:
+                pass
+        else:
+            yield i, res
 
 
 def extract_filename(res: Response) -> str:
@@ -147,7 +156,9 @@ def extract_filename(res: Response) -> str:
     return decoded_filename
 
 
-def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner: Halo) -> str:
+def archive_thread_files(
+    base_dir: str, thread: API_Thread_WithComments, spinner: Halo, log: TextIO
+) -> str:
     """
     Archive all static files from a thread and return new json string with
     converted links.
@@ -163,10 +174,14 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
 
     cnt, total = 1, len(links_to_archive)
     old_spinner_text = spinner.text
-    reqs = [grequests.get(link) for link, _ in links_to_archive]
-    for i, res in gen_get_requests(reqs):
+
+    session = requests.Session() # use session to avoid "too many open files"
+    reqs = [grequests.get(link, session=session) for link, _ in links_to_archive]
+
+    for i, res in gen_get_requests(spinner, reqs, log):
         link, pl = links_to_archive[i] # Indices come back in arbitrary order
         filename = extract_filename(res)
+
         status = f"{cnt}/{total} | {Color.MAGENTA}Archiving file{Color.NC}: {filename}"
         spinner.text = f"{old_spinner_text} <<< {status}"
         cnt += 1
@@ -183,10 +198,13 @@ def archive_thread_files(base_dir: str, thread: API_Thread_WithComments, spinner
         filename = os.listdir(path)[0]
         thread_json = thread_json.replace(link, f"assets/{pl.path.strip("/")}/{filename}")
 
+    spinner.text = old_spinner_text
     return thread_json
 
 
-def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner: Halo, cnt: int) -> tuple[str, list[API_User_Short]]:
+def archive_thread(
+    base_dir: str, thread_with_user: API_Thread_WithUser, spinner: Halo, cnt: int, log: TextIO
+) -> tuple[str, list[API_User_Short]]:
     """Archive a single discussion thread"""
     tid = thread_with_user["id"]
     dst = f"{base_dir}/.cache/{tid}.json"
@@ -204,31 +222,42 @@ def archive_thread(base_dir: str, thread_with_user: API_Thread_WithUser, spinner
         f.write(json.dumps(thread, indent=2))
         f.close()
 
-    return archive_thread_files(base_dir, thread["thread"], spinner), thread["users"]
+    return (
+        archive_thread_files(base_dir, thread["thread"], spinner, log),
+        archive_user_avatars(base_dir, thread["users"], spinner, log)
+    )
 
 
-def archive_user_avatars(base_dir: str, users: list[API_User_Short], spinner: Halo):
+def archive_user_avatars(base_dir: str, users: list[API_User_Short], spinner: Halo, log: TextIO) -> list[API_User_Short]:
     """Archive user profile photos"""
+    session = requests.Session() # use session to avoid "too many open files"
     reqs, users_to_archive = [], []
     for user in users:
         avatar = user["avatar"]
         if avatar is None or os.path.isfile(f"{base_dir}/avatars/{avatar}.jpg"):
             continue
-        reqs.append(grequests.get(f"{ED_USER_AVATAR_BASE_URL}/{avatar}"))
+
         users_to_archive.append(user)
+        reqs.append(grequests.get(f"{ED_USER_AVATAR_BASE_URL}/{avatar}",
+                                  session=session))
 
     dir = f"{base_dir}/avatars"
     pathlib.Path(dir).mkdir(parents=True, exist_ok=True)
+    old_spinner_text = spinner.text
 
     cnt, total = 1, len(users_to_archive)
-    for i, res in gen_get_requests(reqs):
+    for i, res in gen_get_requests(spinner, reqs, log):
         user = users_to_archive[i]
-        spinner.text = f"{cnt}/{total} | {Color.MAGENTA}Archiving user photo: {user["name"]}{Color.NC}"
+
+        status = f"{cnt}/{total} | {Color.MAGENTA}Archiving user photo{Color.NC}: {user["name"]}"
+        spinner.text = f"{old_spinner_text} <<< {status}"
         cnt += 1
 
-        f = open(f"{dir}/{user["avatar"]}.jpg", "wb")
-        f.write(res.content)
-        f.close()
+        with open(f"{dir}/{user["avatar"]}.jpg", "wb") as f:
+            f.write(res.content)
+
+    spinner.text = old_spinner_text
+    return users
 
 
 def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithComments]:
@@ -246,31 +275,34 @@ def archive_course(course: API_Course, spinner: Halo) -> list[API_Thread_WithCom
     with open(f"{assets_dir}/info.json", "w") as f:
         f.write(json.dumps(course, indent=2))
 
-    users = []
-    results, cnt = [], 1
-    pathlib.Path(f"{assets_dir}/.cache").mkdir(parents=True, exist_ok=True)
-    spinner.start()
+    with open(os.path.join(dirname, ERRLOG), "a") as log:
+        users = {} # use dict to ensure no duplicates
+        results, cnt = [], 1
+        pathlib.Path(f"{assets_dir}/.cache").mkdir(parents=True, exist_ok=True)
+        spinner.start()
 
-    for res in gen_threads(course["id"]):
-        users.extend(res["users"])
-        for thread_with_user in res["threads"]:
-            thread_json, thread_users = archive_thread(assets_dir, thread_with_user, spinner, cnt)
-            users.extend(thread_users)
-            results.append(json.loads(thread_json))
-            cnt += 1
+        for res in gen_threads(course["id"]):
+            for user in res["users"]:
+                users[user["id"]] = user
 
-    with open(f"{assets_dir}/posts.json", "w") as f:
-        f.write(json.dumps(results, indent=2))
+            for thread_with_user in res["threads"]:
+                thread_json, thread_users = archive_thread(assets_dir, thread_with_user, spinner, cnt, log)
+                for user in thread_users:
+                    users[user["id"]] = user
+                results.append(json.loads(thread_json))
+                cnt += 1
 
-    archive_user_avatars(assets_dir, users, spinner)
-    with open(f"{assets_dir}/users.json", "w") as f:
-        f.write(json.dumps(users, indent=2))
+        with open(f"{assets_dir}/posts.json", "w") as f:
+            f.write(json.dumps(results, indent=2))
 
-    spinner.text = f"{Color.MAGENTA}Generating static site...{Color.NC}"
-    generate_site(assets_dir, dirname)
+        with open(f"{assets_dir}/users.json", "w") as f:
+            f.write(json.dumps(list(users.values()), indent=2))
 
-    spinner.succeed(f"Successfully archived {len(results)} threads!")
-    return results
+        spinner.text = f"{Color.MAGENTA}Generating static site...{Color.NC}"
+        generate_site(assets_dir, dirname)
+
+        spinner.succeed(f"Successfully archived {len(results)} threads!")
+        return results
 
 
 def main(courses: list[API_Course] = []):
