@@ -18,8 +18,8 @@ from edapi.types.api_types.course import API_Course
 from edapi.types.api_types.thread import API_Thread_WithComments, API_Thread_WithUser, API_User_Short
 from edapi.types.api_types.endpoints.threads import API_ListThreads_Response, API_GetThread_Response
 from edapi.types import EdError
-type ThreadGenerator = Generator[API_ListThreads_Response, None, None]
-type RequestGenerator = Generator[tuple[int, Response], None, None]
+ThreadGenerator = Generator[API_ListThreads_Response, None, None]
+RequestGenerator = Generator[tuple[int, Response], None, None]
 
 
 # Global config
