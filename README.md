@@ -26,6 +26,8 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Python version 3.12 recommended
+
 ## Usage
 
 - Generate an Ed API token [here](https://edstem.org/us/settings/api-tokens).
