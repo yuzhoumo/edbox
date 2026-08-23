@@ -70,13 +70,41 @@ def transform_documents_to_html(posts):
     }
 
     def simple_transform(text, old_tag, new_tag):
-        pattern = rf'<{old_tag}(.*?)>(.*?)</{old_tag}>'
-        def replace_with_new_tag(match):
-            attributes = match.group(1)
-            inner_text = match.group(2)
-            return f'<{new_tag}{attributes}>{inner_text}</{new_tag}>'
-        replaced_text = re.sub(pattern, replace_with_new_tag, text)
-        return replaced_text
+        open_re = re.compile(rf'<{old_tag}([^>]*)>')
+        close_re = re.compile(rf'</{old_tag}>')
+        result = []
+        last = 0
+        while True:
+            open_match = open_re.search(text, last)
+            if not open_match:
+                break
+            depth = 1
+            search_from = open_match.end()
+            close_at = None
+            while depth > 0:
+                next_open = open_re.search(text, search_from)
+                next_close = close_re.search(text, search_from)
+                if not next_close:
+                    depth = 0
+                    break
+                if next_open and next_open.start() < next_close.start():
+                    depth += 1
+                    search_from = next_open.end()
+                else:
+                    depth -= 1
+                    search_from = next_close.end()
+                    if depth == 0:
+                        close_at = next_close
+            if close_at is None:
+                break
+            attributes = open_match.group(1)
+            inner_text = text[open_match.end():close_at.start()]
+            inner_text = simple_transform(inner_text, old_tag, new_tag)
+            result.append(text[last:open_match.start()])
+            result.append(f'<{new_tag}{attributes}>{inner_text}</{new_tag}>')
+            last = close_at.end()
+        result.append(text[last:])
+        return "".join(result)
 
     for i, post in enumerate(posts):
         content = post["content"]
