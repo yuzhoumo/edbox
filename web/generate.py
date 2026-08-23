@@ -169,6 +169,7 @@ def generate_site(src_dir: str, target_dir: str):
 
 if __name__ == "__main__":
     # usage: python3 generate.py [ASSETS_DIR] [OUTPUT_DIR]
-    assert len(sys.argv) == 3, f"Expected 3 arguments, got {len(sys.argv)}"
+    if len(sys.argv) != 3:
+        sys.exit("usage: python3 generate.py [ASSETS_DIR] [OUTPUT_DIR]")
     generate_site(sys.argv[1], sys.argv[2])
 

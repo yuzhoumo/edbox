@@ -99,6 +99,8 @@ def parse_selection(selection: str, num_classes: int) -> set[int]:
         first, last = int(pair[0]), int(pair[-1])
         if first < 1 or last > num_classes:
             raise ValueError(f"Selection is out of range")
+        if first > last:
+            raise ValueError(f"Invalid range {first}-{last}: start is greater than end")
         result.update(range(int(first), int(last)+1))
     return result
 
@@ -142,18 +144,25 @@ def gen_get_requests(spinner: Halo, reqs: list[grequests.AsyncRequest], log: Tex
                 msg = f"{timestamp} Failed to get: {reqs[i].url}\n"
                 spinner.fail(msg)
                 log.write(msg)
-            except IOError:
-                pass
+            except IOError as e:
+                print(f"{Color.FAIL}Failed to write to log: {e}{Color.NC}")
         else:
             yield i, res
 
 
 def extract_filename(res: Response) -> str:
     """Parse url encoded filename from header and return decoded filename"""
-    cd = res.headers["content-disposition"]
-    encoded_filename = re.findall("filename=\"(.+)\"", cd)[0]
-    decoded_filename = unquote(encoded_filename)
-    return decoded_filename
+    cd = res.headers.get("content-disposition")
+    if not cd:
+        raise ValueError("Response missing Content-Disposition header")
+    # Prefer RFC 5987 encoded filename* when present
+    star = re.search(r"filename\*\s*=\s*(?:[^\']*\'\')?([^;]+)", cd)
+    if star:
+        return unquote(star.group(1).strip().strip('"'))
+    plain = re.search(r'filename\s*=\s*"([^"]+)"', cd)
+    if not plain:
+        raise ValueError(f"Could not find filename in Content-Disposition: {cd!r}")
+    return unquote(plain.group(1))
 
 
 def archive_thread_files(
