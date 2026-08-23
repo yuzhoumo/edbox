@@ -78,7 +78,7 @@
             <span class="text-[#ff8c66]" x-text="currentPost.is_anonymous ? 'Anonymous' : getAuthorName(currentPost, userMap)"></span>
             <span
               class="text-[0.5rem] font-semibold bg-[#372dad] rounded-md px-1 py-[2px]"
-              x-show="!currentPost.is_anonymous && userMap[currentPost.user_id].course_role === 'admin'"
+              x-show="!currentPost.is_anonymous && userMap[currentPost.user_id]?.course_role === 'admin'"
             >
               STAFF
             </span>
@@ -126,7 +126,7 @@
         x-html="
           'Last updated ' + formatDate(currentPost.updated_at) +
           ' by <b>' + (currentPost.is_anonymous ? 'Anonymous' :
-          userMap[currentPost.user_id].name) + '</b>'
+          userMap[currentPost.user_id]?.name ?? 'Unknown') + '</b>'
         "
       ></span>
     </div>
