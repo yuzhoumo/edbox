@@ -24,7 +24,7 @@ RequestGenerator = Generator[tuple[int, Response], None, None]
 
 # Global config
 ED_USER_AVATAR_BASE_URL = "https://static.us.edusercontent.com/avatars"
-ED_CDN_REGEX = r"(?:(?:http[s]?://)?(?:static\.us\.edusercontent\.com))/files/[^\\\'\"\s)]*"
+ED_CDN_REGEX = r"(?://|https?://)static\.us\.edusercontent\.com/files/[^\\\'\"\s)]*"
 OUT_DIR = "out"
 ERRLOG = "errors.log"
 TIMEOUT_SECONDS = 30
@@ -176,7 +176,7 @@ def archive_thread_files(
     old_spinner_text = spinner.text
 
     session = requests.Session() # use session to avoid "too many open files"
-    reqs = [grequests.get(link, session=session) for link, _ in links_to_archive]
+    reqs = [grequests.get(link if link.startswith("http") else f"https:{link}", session=session) for link, _ in links_to_archive]
 
     for i, res in gen_get_requests(spinner, reqs, log):
         link, pl = links_to_archive[i] # Indices come back in arbitrary order
@@ -186,12 +186,10 @@ def archive_thread_files(
         spinner.text = f"{old_spinner_text} <<< {status}"
         cnt += 1
 
-        dir = f"{base_dir}{pl.path}"
-        pathlib.Path(dir).mkdir(parents=True, exist_ok=True)
-        f = open(f"{dir}/{filename}", "wb")
-        f.write(res.content)
-        f.close()
-        os.listdir(dir)[0]
+        dir_path = f"{base_dir}{pl.path}"
+        pathlib.Path(dir_path).mkdir(parents=True, exist_ok=True)
+        with open(f"{dir_path}/{filename}", "wb") as f:
+            f.write(res.content)
 
     for link, pl in zip(links, parsed_links):
         path = f"{base_dir}{pl.path}"
