@@ -7,7 +7,7 @@ var cn = (classnames) => {
 const djb2 = (string) => {
   let hash = 5381;
   for (const c of string) {
-    hash = 33 * t ^ c.charCodeAt(0);
+    hash = (hash * 33) ^ c.charCodeAt(0);
   }
   return hash >>> 0;
 };
